@@ -1,14 +1,15 @@
-FROM debian:jessie
-MAINTAINER Thomas <zhgqthomas@gmail.com>
+FROM centos:6.9
+MAINTAINER Jaeger <JaegerCode@gmail.com>
 
-COPY docker-entrypoint.sh /entrypoint.sh
-
-COPY start.sh /start.sh
+ADD install.sh /root/
+ADD start.sh /
 
 USER root
 
-EXPOSE 80 8888 888 443 20 21
+RUN yum -y install initscripts \
+	&& sh /root/install.sh 2>&1 | tee /root/install.log \
+	yum clean all 
 
-RUN bash /entrypoint.sh 2>&1 | tee /root/install.log
+EXPOSE 80 8888 888 443 20 21
 
 CMD /start.sh
