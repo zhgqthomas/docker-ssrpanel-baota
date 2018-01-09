@@ -2,7 +2,6 @@ version: '3'
 
 services:
   baota:
-    restart: always
     build: .
     container_name: baota
     ports:
