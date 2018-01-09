@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  baota:
+    restart: always
+    build: .
+    container_name: baota
+    ports:
+      - "80:80"
+      - "888:888"
+      - "8888:8888"
+      - "443:443"
+      - "20:20"
+      - "21:21"
