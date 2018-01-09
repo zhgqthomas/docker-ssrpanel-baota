@@ -8,7 +8,7 @@ USER root
 
 RUN yum -y install initscripts \
 	&& sh /root/install.sh 2>&1 | tee /root/install.log \
-	yum clean all 
+	&& yum clean all 
 
 EXPOSE 80 8888 888 443 20 21
 
