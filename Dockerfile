@@ -9,6 +9,6 @@ USER root
 RUN yum -y install initscripts wget\
 	&& sh /root/install.sh
 
-EXPOSE 80 8888 888 443 20 21
+EXPOSE 80 8888 888 443 20 21 3306
 
-CMD ["/bin/bash"]
+CMD ["/start.sh"]

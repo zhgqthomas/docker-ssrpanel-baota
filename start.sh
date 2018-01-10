@@ -3,4 +3,4 @@
 echo 'starting bt....'
 service bt start
 
-/bin/bash
+tail -F /www/server/panel/logs
