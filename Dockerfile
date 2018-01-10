@@ -6,7 +6,7 @@ COPY start.sh /
 
 USER root
 
-RUN yum -y install initscripts \
+RUN yum -y install initscripts wget\
 	&& sh /root/install.sh
 
 EXPOSE 80 8888 888 443 20 21
