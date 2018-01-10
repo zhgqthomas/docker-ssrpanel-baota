@@ -1,13 +1,12 @@
-FROM centos:6.9
-MAINTAINER Jaeger <JaegerCode@gmail.com>
+FROM debian:jessie
+MAINTAINER Thomas <Thomas@gmail.com>
 
-ADD install.sh /root/
-ADD start.sh /
+COPY install.sh /root/
 
 USER root
 
-RUN yum -y install initscripts && sh /root/install.sh 2>&1 | tee /root/install.log
-
-RUN yum clean all
+RUN sh /root/install.sh 2>&1 | tee /root/install.log
 
 EXPOSE 80 8888 888 443 20 21
+
+ENTRYPOINT service bt start && bash

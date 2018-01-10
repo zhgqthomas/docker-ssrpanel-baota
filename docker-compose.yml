@@ -11,4 +11,3 @@ services:
       - "443:443"
       - "20:20"
       - "21:21"
-    command: sh /start.sh

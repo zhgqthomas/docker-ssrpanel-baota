@@ -1,44 +1,67 @@
 #!/bin/bash
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
 export PATH
-
-isUbuntu=`cat /etc/issue|grep Ubuntu`
-if [ "$isUbuntu" != "" ];then
-	wget -O install.sh http://download.bt.cn/install/install-ubuntu.sh && sudo bash install.sh
-	exit;
-fi
-
-isDebian=`cat /etc/issue|grep Debian`
-if [ "$isUbuntu" != "" ];then
-	wget -O install.sh http://download.bt.cn/install/install-ubuntu.sh && bash install.sh
-	exit;
-fi
-
+LANG=en_US.UTF-8
 echo "
 +----------------------------------------------------------------------
-| Bt-WebPanel 4.x FOR CentOS/Redhat/Fedora/Ubuntu/Debian
+| Bt-WebPanel 5.x FOR Ubuntu/Debian
 +----------------------------------------------------------------------
 | Copyright © 2015-2017 BT-SOFT(http://www.bt.cn) All rights reserved.
 +----------------------------------------------------------------------
 | The WebPanel URL will be http://SERVER_IP:8888 when installed.
 +----------------------------------------------------------------------
 "
+deepinSys=`cat /etc/issue`
+if [[ "${deepinSys}" =~ eepin ]]; then
+	isroot=''
+	if [ `whoami` != "root" ];then
+		isroot='sudo '
+	fi
+	if [ -f "/etc/init.d/bt" ]; then
+		password=`${isroot}cat /www/server/panel/default.pl`
+		port=`${isroot}cat /www/server/panel/data/port.pl`
+		echo -e "=================================================================="
+		echo -e "Bt-Panel: http://localhost:$port"
+		echo -e "默认账户: admin"
+		echo -e "默认密码: $password"
+		echo -e "=================================================================="
+		echo -e "正在尝试打开浏览器..."
+		if [ -f "/opt/google/chrome/chrome" ]; then
+			${isroot}/opt/google/chrome/chrome --no-sandbox http://localhost:$port
+			exit;
+		fi
+		if [ -f "/usr/lib/firefox/firefox" ]; then
+			/usr/lib/firefox/firefox http://localhost:$port
+			exit;
+		fi
+		echo -e "找不到chrome/firefox浏览器，请自行打开浏览器访问宝塔面板: http://loshost:$port"
+		exit;
+
+	fi
+fi
+if [ `whoami` != "root" ];then
+	echo -e "\033[31mError: Please run the script with root privileges on Ubuntu, for example: sudo bash install.sh\033[0m";
+	exit;
+fi
+
 #自动选择下载节点
 CN='125.88.182.172'
-HK='103.224.251.79'
+HK='download.bt.cn'
 HK2='103.224.251.67'
 US='128.1.164.196'
+sleep 0.5;
 CN_PING=`ping -c 1 -w 1 $CN|grep time=|awk '{print $7}'|sed "s/time=//"`
 HK_PING=`ping -c 1 -w 1 $HK|grep time=|awk '{print $7}'|sed "s/time=//"`
 HK2_PING=`ping -c 1 -w 1 $HK2|grep time=|awk '{print $7}'|sed "s/time=//"`
 US_PING=`ping -c 1 -w 1 $US|grep time=|awk '{print $7}'|sed "s/time=//"`
+
 echo "$HK_PING $HK" > ping.pl
 echo "$HK2_PING $HK2" >> ping.pl
 echo "$US_PING $US" >> ping.pl
 echo "$CN_PING $CN" >> ping.pl
-nodeAddr=`sort -n -b ping.pl|sed -n '1p'|awk '{print $2}'`
+nodeAddr=`sort -V ping.pl|sed -n '1p'|awk '{print $2}'`
 if [ "$nodeAddr" == "" ];then
-	nodeAddr=$HK
+	nodeAddr=$HK2
 fi
 download_Url=http://$nodeAddr:5880
 rm -f ping.pl
@@ -54,29 +77,22 @@ fi
 # 	read -p "Do you want to install Bt-Panel to the $setup_path directory now?(y/n): " go;
 # done
 
-# if [ "$go" == 'n' ];then
+# if [ "$go" = 'n' ];then
 # 	exit;
 # fi
-
+startTime=`date +%s`
 
 #数据盘自动分区
 fdiskP(){
 	
-	for i in `cat /proc/partitions|grep -v name|grep -v ram|awk '{print $4}'|grep -v '^$'|grep -v '[0-9]$'|grep -v 'vda'|grep -v 'xvda'|grep -v 'sda'|grep -e 'vd' -e 'sd' -e 'xvd'`;
+	for i in `cat /proc/partitions|grep -v name|grep -v ram|awk '{print $4}'|grep -v '^$'|grep -v '[0-9]$'|grep -e 'vd' -e 'sd' -e 'xv'`;
 	do
-		#判断指定目录是否被挂载
+		#判断/www是否被挂载
 		isR=`df -P|grep $setup_path`
 		if [ "$isR" != "" ];then
-			echo "Error: The $setup_path directory has been mounted."
+			echo 'Warning: The /www directory has been mounted.'
 			return;
 		fi
-		
-		isM=`df -P|grep '/dev/${i}1'`
-		if [ "$isM" != "" ];then
-			echo "/dev/${i}1 has been mounted."
-			continue;
-		fi
-			
 		#判断是否存在未分区磁盘
 		isP=`fdisk -l /dev/$i |grep -v 'bytes'|grep "$i[1-9]*"`
 		if [ "$isP" = "" ];then
@@ -135,139 +151,27 @@ EOF
 }
 #fdiskP
 
-#自动挂载Swap
-autoSwap()
-{
-	swap=`free |grep Swap|awk '{print $2}'`
-	if [ $swap -gt 1 ];then
-        echo "Swap total sizse: $swap";
-		return;
-	fi
-	if [ ! -d /www ];then
-		mkdir /www
-	fi
-	swapFile='/www/swap'
-	dd if=/dev/zero of=$swapFile bs=1M count=1025
-	mkswap -f $swapFile
-    swapon $swapFile
-    echo "$swapFile    swap    swap    defaults    0 0" >> /etc/fstab
-	swap=`free |grep Swap|awk '{print $2}'`
-	if [ $swap -gt 1 ];then
-        echo "Swap total sizse: $swap";
-		return;
-	fi
-	
-	sed -i "/\/www\/swap/d" /etc/fstab
-	rm -f $swapFile
-}
-autoSwap
+ln -sf bash /bin/sh
+apt-get install ruby -y
+apt-get update -y
+apt-get install lsb-release -y
+#apt-get install ntp ntpdate -y
+#/etc/init.d/ntp stop
+#update-rc.d ntp remove
+#cat >>~/.profile<<EOF
+#TZ='Asia/Shanghai'; export TZ
+#EOF
+#rm -rf /etc/localtime
+#cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+#echo 'Synchronizing system time...'
+#ntpdate 0.asia.pool.ntp.org
+#apt-get upgrade -y
+for pace in wget curl python python-dev python-imaging zip unzip openssl libssl-dev gcc libxml2 libxml2-dev libxslt zlib1g zlib1g-dev libjpeg-dev libpng-dev lsof libpcre3 libpcre3-dev cron;
+do apt-get -y install $pace --force-yes; done
+apt-get -y install python-pip python-dev
 
-#判断kernel-headers组件是否安装
-rpm -qa | grep kernel-headers > kernel-headers.pl
-kernelStatus=`cat kernel-headers.pl`
-#判断华为云
-huaweiLogin=`cat /etc/motd |grep 4000-955-988`
-huaweiSys=`cat /etc/redhat-release | grep 1611`
-if [ "$huaweiLogin" != "" ] && [ "$huaweiSys" != "" ]; then
-	if [ "$kernelStatus" = "" ]; then
-		wget http://125.88.182.172:5880/src/kernel-headers-3.10.0-514.el7.x86_64.rpm
-		rpm -ivh kernel-headers-3.10.0-514.el7.x86_64.rpm
-		rm -f kernel-headers-3.10.0-514.el7.x86_64.rpm
-	fi
-fi
-rm -f kernel-headers.pl
-
-yum clean all
-yum install ntp -y
-\cp -a -r /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-echo 'Synchronizing system time...'
-ntpdate 0.asia.pool.ntp.org
-startTime=`date +%s`
-yum upgrade -y
-setenforce 0
-sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
-for pace in wget python-devel python-imaging zip unzip openssl openssl-devel gcc libxml2 libxml2-dev libxslt* zlib zlib-devel libjpeg-devel libpng-devel libwebp libwebp-devel freetype freetype-devel lsof pcre pcre-devel vixie-cron crontabs;
-do 
-	yum -y install $pace; 
-done
-
-yum install python-devel -y
-
-if [ -f '/www/server/mysql/bin/mysql_config' ];then
-	SetLink
-fi
-
-if [ ! -f '/usr/bin/mysql_config' ];then
-	yum install mysql-devel -y
-fi
-
-tmp=`python -V 2>&1|awk '{print $2}'`
+tmp=$(python -V 2>&1|awk '{print $2}')
 pVersion=${tmp:0:3}
-
-SetLink()
-{
-	mSetup_Path=/www/server/mysql
-    ln -sf ${mSetup_Path}/bin/mysql /usr/bin/mysql
-    ln -sf ${mSetup_Path}/bin/mysqldump /usr/bin/mysqldump
-    ln -sf ${mSetup_Path}/bin/myisamchk /usr/bin/myisamchk
-    ln -sf ${mSetup_Path}/bin/mysqld_safe /usr/bin/mysqld_safe
-    ln -sf ${mSetup_Path}/bin/mysqlcheck /usr/bin/mysqlcheck
-	ln -sf ${mSetup_Path}/bin/mysql_config /usr/bin/mysql_config
-	
-	rm -f /usr/lib/libmysqlclient.so.16
-	rm -f /usr/lib64/libmysqlclient.so.16
-	rm -f /usr/lib/libmysqlclient.so.18
-	rm -f /usr/lib64/libmysqlclient.so.18
-	rm -f /usr/lib/libmysqlclient.so.20
-	rm -f /usr/lib64/libmysqlclient.so.20
-	
-	if [ -f "${mSetup_Path}/lib/libmysqlclient.so.18" ];then
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.18 /usr/lib/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.18 /usr/lib64/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.18 /usr/lib/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.18 /usr/lib64/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.18 /usr/lib/libmysqlclient.so.20
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.18 /usr/lib64/libmysqlclient.so.20
-	elif [ -f "${mSetup_Path}/lib/mysql/libmysqlclient.so.18" ];then
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.18 /usr/lib/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.18 /usr/lib64/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.18 /usr/lib/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.18 /usr/lib64/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.18 /usr/lib/libmysqlclient.so.20
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.18 /usr/lib64/libmysqlclient.so.20
-	elif [ -f "${mSetup_Path}/lib/libmysqlclient.so.16" ];then
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.16 /usr/lib/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.16 /usr/lib64/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.16 /usr/lib/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.16 /usr/lib64/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.16 /usr/lib/libmysqlclient.so.20
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.16 /usr/lib64/libmysqlclient.so.20
-	elif [ -f "${mSetup_Path}/lib/mysql/libmysqlclient.so.16" ];then
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.16 /usr/lib/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.16 /usr/lib64/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.16 /usr/lib/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.16 /usr/lib64/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.16 /usr/lib/libmysqlclient.so.20
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.16 /usr/lib64/libmysqlclient.so.20
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient_r.so.16 /usr/lib/libmysqlclient_r.so.16
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient_r.so.16 /usr/lib64/libmysqlclient_r.so.16
-	elif [ -f "${mSetup_Path}/lib/libmysqlclient.so.20" ];then
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.20 /usr/lib/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.20 /usr/lib64/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.20 /usr/lib/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.20 /usr/lib64/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.20 /usr/lib/libmysqlclient.so.20
-		ln -sf ${mSetup_Path}/lib/libmysqlclient.so.20 /usr/lib64/libmysqlclient.so.20
-	elif [ -f "${mSetup_Path}/lib/mysql/libmysqlclient.so.20" ];then
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.20 /usr/lib/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.20 /usr/lib64/libmysqlclient.so.16
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.20 /usr/lib/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.20 /usr/lib64/libmysqlclient.so.18
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.20 /usr/lib/libmysqlclient.so.20
-		ln -sf ${mSetup_Path}/lib/mysql/libmysqlclient.so.20 /usr/lib64/libmysqlclient.so.20
-	fi
-	ldconfig
-}
 
 Install_setuptools()
 {
@@ -287,39 +191,10 @@ Install_setuptools()
 		exit;
 	fi
 }
-
-Install_pip()
-{
-	ispip=`pip -V |grep from`
-	if [ "$ispip" == "" ];then
-		if [ ! -f "/usr/bin/easy_install" ];then
-			Install_setuptools
-		fi
-		wget -O pip-9.0.1.tar.gz $download_Url/install/src/pip-9.0.1.tar.gz -T 10
-		tar xvf pip-9.0.1.tar.gz
-		rm -f pip-9.0.1.tar.gz
-		cd pip-9.0.1
-		python setup.py install
-		cd ..
-		rm -rf pip-9.0.1
-	fi
-	ispip=`pip -V |grep from`
-	if [ "$ispip" = "" ];then
-		echo '=================================================';
-		echo -e "\033[31m Python-pip installation failed. \033[0m";
-		exit;
-	fi
-}
-
 Install_Pillow()
 {
 	isSetup=`python -m PIL 2>&1|grep package`
 	if [ "$isSetup" = "" ];then
-		isFedora = `cat /etc/redhat-release |grep Fedora`
-		if [ "$isFedora" != "" ];then
-			pip install Pillow
-			return;
-		fi
 		wget -O Pillow-3.2.0.zip $download_Url/install/src/Pillow-3.2.0.zip -T 10
 		unzip Pillow-3.2.0.zip
 		rm -f Pillow-3.2.0.zip
@@ -328,7 +203,6 @@ Install_Pillow()
 		cd ..
 		rm -rf Pillow-3.2.0
 	fi
-	
 	isSetup=`python -m PIL 2>&1|grep package`
 	if [ "$isSetup" = "" ];then
 		echo '=================================================';
@@ -369,6 +243,7 @@ Install_mysqldb()
 		cd ..
 		rm -rf MySQL-python-1.2.5
 	fi
+	
 }
 
 Install_chardet()
@@ -382,8 +257,7 @@ Install_chardet()
 		python setup.py install
 		cd ..
 		rm -rf chardet-2.3.0
-	fi	
-	
+	fi
 	isSetup=`python -m chardet 2>&1|grep package`
 	if [ "$isSetup" = "" ];then
 		echo '=================================================';
@@ -412,30 +286,20 @@ Install_webpy()
 		exit;
 	fi
 }
+pipArg=''
 
 
-Install_setuptools
-Install_pip
+pip install setuptools
+pip install --upgrade pip $pipArg
+pip install psutil chardet web.py virtualenv Pillow $pipArg
 
-if [ "$nodeAddr" = "$CN" ]; then
-	if [ ! -d "/root/.pip" ];then
-		mkdir ~/.pip
-	fi
-    cat > ~/.pip/pip.conf <<EOF
-[global]
-index-url = https://pypi.doubanio.com/simple/
-
-[install]
-trusted-host=pypi.doubanio.com
-EOF
-fi
-
-pip install --upgrade pip
-pip install psutil mysql-python chardet web.py virtualenv
 
 Install_Pillow
 Install_psutil
-Install_mysqldb
+if [  -f /www/server/mysql/bin/mysql ]; then
+	pip install mysql-python
+	Install_mysqldb
+fi
 Install_chardet
 Install_webpy
 
@@ -448,7 +312,7 @@ chmod +x $setup_path/server/panel/certbot-auto
 
 
 if [ -f '/etc/init.d/bt' ];then
-	service bt stop
+	/etc/init.d/bt stop
 fi
 
 mkdir -p /www/server
@@ -457,10 +321,6 @@ mkdir -p /www/wwwlogs
 mkdir -p /www/backup/database
 mkdir -p /www/backup/site
 
-if [ ! -f "/usr/bin/unzip" ];then
-	#rm -f /etc/yum.repos.d/epel.repo
-	yum install unzip -y
-fi
 wget -O panel.zip $download_Url/install/src/panel.zip -T 10
 wget -O /etc/init.d/bt $download_Url/install/src/bt.init -T 10
 if [ -f "$setup_path/server/panel/data/default.db" ];then
@@ -502,19 +362,17 @@ fi
 rm -f $setup_path/server/panel/class/*.pyc
 rm -f $setup_path/server/panel/*.pyc
 python -m compileall $setup_path/server/panel
-rm -f $setup_path/server/panel/class/*.py
-rm -f $setup_path/server/panel/*.py
+#rm -f $setup_path/server/panel/class/*.py
+#rm -f $setup_path/server/panel/*.py
 
-
-
+chmod 777 /tmp
 chmod +x /etc/init.d/bt
-chkconfig --add bt
-chkconfig --level 2345 bt on
+update-rc.d bt defaults
 chmod -R 600 $setup_path/server/panel
 chmod +x $setup_path/server/panel/certbot-auto
 chmod -R +x $setup_path/server/panel/script
 echo "$port" > $setup_path/server/panel/data/port.pl
-service bt start
+/etc/init.d/bt start
 password=`cat /dev/urandom | head -n 16 | md5sum | head -c 8`
 cd $setup_path/server/panel/
 username=`python tools.pyc panel $password`
@@ -529,87 +387,52 @@ if [ "$isStart" == '' ];then
 	exit;
 fi
 
-if [ -f "/etc/init.d/iptables" ];then
-	iptables -I INPUT -p tcp -m state --state NEW -m tcp --dport 20 -j ACCEPT
-	iptables -I INPUT -p tcp -m state --state NEW -m tcp --dport 21 -j ACCEPT
-	iptables -I INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT
-	iptables -I INPUT -p tcp -m state --state NEW -m tcp --dport 80 -j ACCEPT
-	iptables -I INPUT -p tcp -m state --state NEW -m tcp --dport $port -j ACCEPT
-	iptables -I INPUT -p tcp -m state --state NEW -m tcp --dport 30000:40000 -j ACCEPT
-	iptables -I INPUT -p tcp -m state --state NEW -m udp --dport 30000:40000 -j ACCEPT
-	iptables -A INPUT -p icmp --icmp-type any -j ACCEPT
-	iptables -A INPUT -s localhost -d localhost -j ACCEPT
-	iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-	iptables -P INPUT DROP
-	service iptables save
-	sed -i "s#IPTABLES_MODULES=\"\"#IPTABLES_MODULES=\"ip_conntrack_netbios_ns ip_conntrack_ftp ip_nat_ftp\"#" /etc/sysconfig/iptables-config
-
-	iptables_status=`service iptables status | grep 'not running'`
-	if [ "${iptables_status}" == '' ];then
-		service iptables restart
-	fi
+if [ ! -f "/usr/bin/ufw" ];then
+	apt-get install -y ufw
 fi
 
-if [ "${isVersion}" == '' ];then
-	if [ ! -f "/etc/init.d/iptables" ];then
-		yum install firewalld -y
-		systemctl enable firewalld
-		systemctl start firewalld
-		firewall-cmd --set-default-zone=public > /dev/null 2>&1
-		firewall-cmd --permanent --zone=public --add-port=20/tcp > /dev/null 2>&1
-		firewall-cmd --permanent --zone=public --add-port=21/tcp > /dev/null 2>&1
-		firewall-cmd --permanent --zone=public --add-port=22/tcp > /dev/null 2>&1
-		firewall-cmd --permanent --zone=public --add-port=80/tcp > /dev/null 2>&1
-		firewall-cmd --permanent --zone=public --add-port=$port/tcp > /dev/null 2>&1
-		firewall-cmd --permanent --zone=public --add-port=30000-40000/tcp > /dev/null 2>&1
-		firewall-cmd --permanent --zone=public --add-port=30000-40000/udp > /dev/null 2>&1
-		firewall-cmd --reload
-	fi
+if [ -f "/usr/sbin/ufw" ];then
+	ufw allow 888,20,21,22,80,$port/tcp
+	ufw allow 39000:40000/tcp
+	ufw_status=`ufw status`
+	echo y|ufw enable
+	ufw default deny
+	ufw reload
 fi
 
-pip install psutil chardet web.py MySQL-python psutil virtualenv > /dev/null 2>&1
-
+pip install psutil chardet web.py psutil virtualenv $pipArg
 if [ ! -d '/etc/letsencrypt' ];then
-	yum install epel-release -y
 
-	if [ "${country}" = "CN" ]; then
-		isC7=`cat /etc/redhat-release |grep ' 7.'`
-		if [ "${isC7}" == "" ];then
-			wget -O /etc/yum.repos.d/epel.repo http://mirrors.aliyun.com/repo/epel-6.repo
-		else
-			wget -O /etc/yum.repos.d/epel.repo http://mirrors.aliyun.com/repo/epel-7.repo
-		fi
-	fi
 	mkdir -p /var/spool/cron
-	if [ ! -f '/var/spool/cron/root' ];then
-		echo '' > /var/spool/cron/root
-		chmod 600 /var/spool/cron/root
+	if [ ! -f '/var/spool/cron/crontabs/root' ];then
+		echo '' > /var/spool/cron/crontabs/root
+		chmod 600 /var/spool/cron/crontabs/root
 	fi
-	isCron=`cat /var/spool/cron/root|grep certbot.log`
+	isCron=`cat /var/spool/cron/crontabs/root|grep certbot.log`
 	if [ "${isCron}" == "" ];then
-		echo "30 2 * * * $setup_path/server/panel/certbot-auto renew >> $setup_path/server/panel/logs/certbot.log" >>  /var/spool/cron/root
-		chown 600 /var/spool/cron/root
+		echo "30 2 * * * $setup_path/server/panel/certbot-auto renew >> $setup_path/server/panel/logs/certbot.log" >>  /var/spool/cron/crontabs/root
+		chown 600 /var/spool/cron/crontabs/root
 	fi
+	service cron restart
 	nohup $setup_path/server/panel/certbot-auto -n > /tmp/certbot-auto.log 2>&1 &
 fi
-
-address=""
-address=`curl -sS --connect-timeout 10 -m 60 https://www.bt.cn/Api/getIpAddress`
-if [ "$address" == "" ];then
-	address="SERVER_IP"
+if [[ "${deepinSys}" =~ eepin ]]; then
+	address="localhost"
+else
+	address=`curl -sS --connect-timeout 10 -m 60 https://www.bt.cn/Api/getIpAddress`
+	if [ "$address" = "" ];then
+		address="SERVER_IP"
+	fi
+	if [ "$address" != "SERVER_IP" ];then
+		echo "$address" > $setup_path/server/panel/data/iplist.txt
+	fi
 fi
-
-if [ "$address" != "SERVER_IP" ];then
-	echo "$address" > $setup_path/server/panel/data/iplist.txt
-fi
-
 curl -sS --connect-timeout 10 -m 60 https://www.bt.cn/Api/SetupCount?type=Linux > /dev/null 2>&1
-
 
 echo -e "=================================================================="
 echo -e "\033[32mCongratulations! Install succeeded!\033[0m"
 echo -e "=================================================================="
-echo  "Bt-Panel: http://$address:$port"
+echo -e "Bt-Panel: http://$address:$port"
 echo -e "username: $username"
 echo -e "password: $password"
 echo -e "\033[33mWarning:\033[0m"
