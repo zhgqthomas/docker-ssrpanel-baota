@@ -2,8 +2,8 @@ version: '3'
 
 services:
   baota:
-    build: .
-    container_name: baota
+    image: lnmp-baota:v1
+    container_name: lnmp-baota
     ports:
       - "80:80"
       - "888:888"
@@ -14,3 +14,4 @@ services:
       - "3306:3306"
     volumes:
       - ./SSRPanel:/www/wwwroot/ssrpanel
+    command: bash /start.sh
