@@ -1,13 +1,14 @@
-FROM centos:6.9
-MAINTAINER Jaeger <JaegerCode@gmail.com>
+FROM centos:7
+MAINTAINER Thomas <Thomas@gmail.com>
 
-ADD install.sh /root/
-ADD start.sh /
+COPY install.sh /root/
+COPY start.sh /
 
 USER root
 
-RUN yum -y install initscripts && sh /root/install.sh 2>&1 | tee /root/install.log
+RUN yum -y install initscripts wget\
+	&& sh /root/install.sh
 
-RUN yum clean all
+EXPOSE 80 8888 888 443 20 21 3306
 
-EXPOSE 80 8888 888 443 20 21
+CMD ["/start.sh"]

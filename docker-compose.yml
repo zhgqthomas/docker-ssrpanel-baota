@@ -3,7 +3,7 @@ version: '3'
 services:
   baota:
     image: zhgqthomas/ssrpanel-baota:v1
-    container_name: baota
+    container_name: ssrpanel-baota
     ports:
       - "80:80"
       - "888:888"
@@ -12,4 +12,7 @@ services:
       - "20:20"
       - "21:21"
       - "10000-15000:10000-15000"
-    command: sh /start.sh
+      - "3306:3306"
+    volumes:
+      - ./SSRPanel:/www/wwwroot/ssrpanel
+    command: bash /start.sh
