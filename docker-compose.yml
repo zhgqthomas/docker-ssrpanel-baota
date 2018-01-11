@@ -2,7 +2,7 @@ version: '3'
 
 services:
   baota:
-    build: .
+    image: zhgqthomas/ssrpanel-baota:v1
     container_name: baota
     ports:
       - "80:80"
@@ -11,4 +11,5 @@ services:
       - "443:443"
       - "20:20"
       - "21:21"
+      - "10000-15000:10000-15000"
     command: sh /start.sh
