@@ -2,7 +2,8 @@ version: '3'
 
 services:
   baota:
-    image: zhgqthomas/ssrpanel-baota:v1
+    restart: always
+    image: zhgqthomas/lnmp-baota:v1
     container_name: ssrpanel-baota
     ports:
       - "80:80"
